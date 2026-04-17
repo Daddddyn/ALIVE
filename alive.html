@@ -1,0 +1,2065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ALive — Live TV</title>
+
+<!-- PWA / iOS -->
+<link rel="manifest" href="alive-manifest.json">
+<meta name="theme-color" content="#060608">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ALive">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('alive-sw.js').catch(e => console.warn('SW failed:', e));
+    });
+  }
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+
+<style>
+/* ══════════════════════════════════════
+   TOKENS
+══════════════════════════════════════ */
+:root {
+  --bg:    #060608;
+  --bg2:   #0b0b0e;
+  --bg3:   #111115;
+  --bg4:   #18181e;
+  --bg5:   #202028;
+  --red:   #e8192c;
+  --red2:  #ff2d41;
+  --rglow: rgba(232,25,44,0.22);
+  --gold:  #f5c518;
+  --green: #22c55e;
+  --blue:  #3b82f6;
+  --text:  #f0f0f4;
+  --text2: #8e8ea8;
+  --text3: #46465a;
+  --b1:    rgba(255,255,255,0.08);
+  --b2:    rgba(255,255,255,0.04);
+  --r:     10px;
+  --rl:    14px;
+  --nav-h: 60px;
+  --tab-h: calc(56px + env(safe-area-inset-bottom));
+  /* safe areas */
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+}
+
+/* ══════════════════════════════════════
+   RESET / BASE
+══════════════════════════════════════ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;height:100%}
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  overflow:hidden;
+  height:100%;
+  -webkit-font-smoothing:antialiased;
+  cursor:default;
+  padding-top:var(--sat);
+  padding-left:var(--sal);
+  padding-right:var(--sar);
+}
+*{-webkit-tap-highlight-color:transparent}
+::selection{background:var(--red);color:#fff}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bg5);border-radius:9px}
+::-webkit-scrollbar-thumb:hover{background:var(--red)}
+
+/* ══════════════════════════════════════
+   GRAIN OVERLAY
+══════════════════════════════════════ */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity:.018;pointer-events:none;z-index:9998
+}
+
+/* ══════════════════════════════════════
+   APP SHELL
+══════════════════════════════════════ */
+#app{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  width:100%;
+  position:relative;
+}
+
+/* ══════════════════════════════════════
+   TOP NAV / HEADER
+══════════════════════════════════════ */
+#topbar{
+  height:var(--nav-h);
+  background:rgba(6,6,8,.92);
+  backdrop-filter:blur(20px) saturate(160%);
+  border-bottom:1px solid var(--b1);
+  display:flex;
+  align-items:center;
+  padding:0 1rem 0 1.1rem;
+  gap:.75rem;
+  flex-shrink:0;
+  position:relative;
+  z-index:100;
+}
+/* red top line */
+#topbar::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent 0%,var(--red) 40%,var(--red2) 60%,transparent 100%);
+}
+
+.logo{
+  font-family:'Syne',sans-serif;
+  font-weight:800;
+  font-size:1.4rem;
+  letter-spacing:-.04em;
+  user-select:none;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  gap:0;
+}
+.logo-a{color:var(--text)}
+.logo-live{color:var(--red);position:relative}
+.logo-live::after{
+  content:'LIVE';
+  position:absolute;top:-8px;right:-28px;
+  font-size:.45rem;letter-spacing:.12em;
+  color:var(--red);font-weight:700;
+  background:rgba(232,25,44,.15);
+  border:1px solid rgba(232,25,44,.3);
+  padding:.06rem .28rem;border-radius:3px;
+}
+.live-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--red);margin-left:.5rem;
+  animation:livepulse 1.8s ease infinite;
+  flex-shrink:0;
+}
+@keyframes livepulse{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:.45;transform:scale(1.5)}
+}
+
+.nav-spacer{flex:1}
+
+/* Search */
+.search-wrap{display:flex;align-items:center;position:relative}
+.search-bar{
+  display:flex;align-items:center;
+  background:var(--bg3);
+  border:1px solid var(--b1);
+  border-right:none;
+  border-radius:8px 0 0 8px;
+  width:0;opacity:0;pointer-events:none;
+  overflow:hidden;
+  transition:width .3s cubic-bezier(.4,0,.2,1),opacity .2s;
+}
+.search-bar.open{width:180px;opacity:1;pointer-events:all}
+#searchInput{
+  flex:1;padding:.56rem .9rem;
+  background:transparent;border:none;
+  color:var(--text);font-size:.84rem;font-family:inherit;outline:none;min-width:0;
+}
+#searchInput::placeholder{color:var(--text3)}
+.search-x{
+  padding:0 .6rem;color:var(--text3);cursor:pointer;
+  font-size:1.1rem;background:none;border:none;
+  display:none;align-items:center;transition:color .15s;line-height:1;
+}
+.search-x.show{display:flex}
+.search-x:hover{color:var(--text)}
+.icon-btn{
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(255,255,255,.06);
+  border:1px solid var(--b1);
+  color:var(--text2);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;flex-shrink:0;
+}
+.icon-btn:hover{background:rgba(255,255,255,.11);color:var(--text)}
+.search-wrap.open .icon-btn{border-radius:0 8px 8px 0;border-left:none;background:var(--bg3)}
+.icon-btn svg{width:16px;height:16px;pointer-events:none}
+
+/* ══════════════════════════════════════
+   MAIN CONTENT AREA
+══════════════════════════════════════ */
+#content{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  position:relative;
+}
+
+/* ══════════════════════════════════════
+   VIEW SYSTEM
+══════════════════════════════════════ */
+.view{display:none;flex:1;flex-direction:column;overflow:hidden}
+.view.active{display:flex}
+
+/* ══════════════════════════════════════
+   CATEGORY TABS (horizontal scroller below player)
+══════════════════════════════════════ */
+.cat-strip{
+  display:flex;
+  gap:.4rem;
+  padding:.55rem .9rem;
+  overflow-x:auto;
+  flex-shrink:0;
+  background:var(--bg2);
+  border-bottom:1px solid var(--b1);
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.cat-strip::-webkit-scrollbar{display:none}
+.cat-pill{
+  flex-shrink:0;
+  padding:.32rem .78rem;
+  border-radius:100px;
+  font-size:.76rem;font-weight:600;letter-spacing:.01em;
+  color:var(--text2);
+  background:var(--bg4);
+  border:1px solid transparent;
+  cursor:pointer;transition:all .18s;white-space:nowrap;
+}
+.cat-pill:hover{color:var(--text);background:var(--bg5)}
+.cat-pill.active{
+  color:#fff;background:var(--red);
+  border-color:var(--red);
+}
+
+/* ══════════════════════════════════════
+   LIVE GUIDE VIEW (main view)
+══════════════════════════════════════ */
+#viewGuide{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+/* Player area */
+.player-panel{
+  background:#000;
+  position:relative;
+  flex-shrink:0;
+}
+/* Responsive player sizing */
+.player-aspect{
+  width:100%;
+  aspect-ratio:16/9;
+  max-height:34vh;
+  position:relative;
+  background:#000;
+}
+@media (orientation:landscape){
+  .player-aspect{max-height:55vh}
+}
+
+#liveVideo{
+  width:100%;height:100%;
+  object-fit:contain;
+  display:block;
+  background:#000;
+}
+.player-overlay{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  pointer-events:none;
+  transition:opacity .3s;
+}
+.player-overlay.hidden{opacity:0}
+.player-overlay-icon{font-size:2.2rem;margin-bottom:.6rem;opacity:.5}
+.player-overlay-msg{
+  font-size:.8rem;color:var(--text3);
+  text-align:center;line-height:1.5;
+  max-width:220px;
+}
+
+/* Now playing bar */
+.now-bar{
+  display:flex;align-items:center;gap:.7rem;
+  padding:.55rem .9rem;
+  background:var(--bg2);
+  border-bottom:1px solid var(--b1);
+  min-height:42px;
+}
+.now-ch-logo{
+  width:32px;height:32px;border-radius:5px;
+  object-fit:contain;background:var(--bg4);
+  flex-shrink:0;
+}
+.now-ch-logo-ph{
+  width:32px;height:32px;border-radius:5px;
+  background:var(--bg4);border:1px solid var(--b1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.6rem;font-weight:700;color:var(--text3);
+  flex-shrink:0;
+}
+.now-info{flex:1;min-width:0}
+.now-ch-name{
+  font-size:.84rem;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.now-prog{
+  font-size:.72rem;color:var(--text2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-top:.05rem;
+}
+.now-badge{
+  flex-shrink:0;
+  display:inline-flex;align-items:center;gap:.3rem;
+  font-size:.65rem;font-weight:700;letter-spacing:.06em;
+  padding:.22rem .55rem;border-radius:4px;
+  background:rgba(232,25,44,.15);
+  border:1px solid rgba(232,25,44,.3);
+  color:var(--red);text-transform:uppercase;
+}
+.now-dot{width:5px;height:5px;border-radius:50%;background:var(--red);animation:livepulse 1.6s ease infinite}
+
+/* Guide body = channel list */
+.guide-body{
+  flex:1;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+
+/* Channel row */
+.ch-row{
+  display:flex;align-items:center;gap:.65rem;
+  padding:.62rem .9rem;
+  border-bottom:1px solid var(--b2);
+  cursor:pointer;
+  transition:background .13s;
+  position:relative;
+}
+.ch-row:hover,.ch-row:active{background:rgba(255,255,255,.04)}
+.ch-row.active{background:rgba(232,25,44,.08)}
+.ch-row.active::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--red);border-radius:0 2px 2px 0;
+}
+.ch-num{
+  width:24px;font-size:.7rem;color:var(--text3);
+  font-weight:600;text-align:right;flex-shrink:0;
+}
+.ch-logo{
+  width:38px;height:38px;border-radius:6px;
+  object-fit:contain;background:var(--bg4);
+  padding:3px;flex-shrink:0;
+}
+.ch-logo-ph{
+  width:38px;height:38px;border-radius:6px;
+  background:var(--bg4);border:1px solid var(--b1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.7rem;font-weight:700;color:var(--text2);
+  flex-shrink:0;letter-spacing:-.02em;
+}
+.ch-info{flex:1;min-width:0}
+.ch-name{
+  font-size:.85rem;font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ch-prog{
+  font-size:.72rem;color:var(--text3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  margin-top:.1rem;
+}
+.ch-group-tag{
+  font-size:.62rem;font-weight:600;
+  color:var(--text3);background:var(--bg4);
+  border:1px solid var(--b2);padding:.1rem .38rem;border-radius:3px;
+  flex-shrink:0;white-space:nowrap;
+}
+
+/* Fav star */
+.ch-fav{
+  width:24px;height:24px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text3);background:none;border:none;cursor:pointer;
+  transition:color .15s;font-size:.9rem;
+}
+.ch-fav.active{color:var(--gold)}
+
+/* ══════════════════════════════════════
+   SECTION HEADERS IN GUIDE
+══════════════════════════════════════ */
+.guide-section-hd{
+  padding:.55rem .9rem .35rem;
+  font-size:.68rem;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text3);
+  background:var(--bg2);
+  border-bottom:1px solid var(--b2);
+  position:sticky;top:0;z-index:10;
+}
+
+/* ══════════════════════════════════════
+   PLAYLIST SETS SELECTOR
+══════════════════════════════════════ */
+.sets-strip{
+  display:flex;gap:.4rem;
+  padding:.5rem .9rem;
+  overflow-x:auto;flex-shrink:0;
+  background:var(--bg3);
+  border-bottom:1px solid var(--b1);
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.sets-strip::-webkit-scrollbar{display:none}
+.set-pill{
+  flex-shrink:0;
+  display:flex;align-items:center;gap:.35rem;
+  padding:.3rem .7rem;
+  border-radius:6px;
+  font-size:.75rem;font-weight:600;
+  color:var(--text2);background:var(--bg4);
+  border:1px solid var(--b1);
+  cursor:pointer;transition:all .18s;white-space:nowrap;
+}
+.set-pill:hover{color:var(--text);background:var(--bg5)}
+.set-pill.active{color:#fff;background:var(--bg5);border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
+.set-status{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--text3);flex-shrink:0;
+}
+.set-pill.active .set-status,.set-pill.loaded .set-status{background:var(--green)}
+
+/* ══════════════════════════════════════
+   CUSTOM URL BAR
+══════════════════════════════════════ */
+.url-bar{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.5rem .9rem;
+  background:var(--bg2);
+  border-bottom:1px solid var(--b1);
+  flex-shrink:0;
+}
+.url-input{
+  flex:1;
+  padding:.5rem .75rem;
+  background:var(--bg3);
+  border:1px solid var(--b1);
+  border-radius:7px;
+  color:var(--text);font-size:.8rem;font-family:inherit;
+  outline:none;
+}
+.url-input:focus{border-color:rgba(232,25,44,.4)}
+.url-input::placeholder{color:var(--text3)}
+.url-load-btn{
+  flex-shrink:0;
+  padding:.5rem .9rem;
+  background:var(--red);border:none;border-radius:7px;
+  color:#fff;font-size:.78rem;font-weight:700;font-family:inherit;
+  cursor:pointer;transition:opacity .18s;white-space:nowrap;
+}
+.url-load-btn:hover{opacity:.86}
+
+/* ══════════════════════════════════════
+   LOADING / ERROR STATES
+══════════════════════════════════════ */
+.loading-state{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:.8rem;
+  color:var(--text3);font-size:.84rem;
+}
+.spin{
+  width:28px;height:28px;border-radius:50%;
+  border:2.5px solid var(--bg5);
+  border-top-color:var(--red);
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-state{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:.7rem;
+  padding:2rem;text-align:center;
+}
+.empty-icon{font-size:2.5rem;opacity:.35}
+.empty-title{font-size:.9rem;font-weight:600;color:var(--text2)}
+.empty-sub{font-size:.78rem;color:var(--text3);line-height:1.5;max-width:230px}
+
+/* ══════════════════════════════════════
+   SETTINGS VIEW
+══════════════════════════════════════ */
+#viewSettings{
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:calc(1rem + var(--sab));
+}
+.settings-body{padding:.5rem 0}
+.settings-section{margin-bottom:1.5rem}
+.settings-section-title{
+  font-size:.68rem;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);
+  padding:.5rem 1rem .3rem;
+}
+.settings-row{
+  display:flex;align-items:center;gap:.8rem;
+  padding:.75rem 1rem;
+  border-bottom:1px solid var(--b2);
+  cursor:pointer;
+  transition:background .13s;
+}
+.settings-row:hover{background:rgba(255,255,255,.03)}
+.settings-row:last-child{border-bottom:none}
+.settings-row-icon{
+  width:34px;height:34px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;flex-shrink:0;
+}
+.settings-row-icon.red{background:rgba(232,25,44,.15)}
+.settings-row-icon.blue{background:rgba(59,130,246,.15)}
+.settings-row-icon.green{background:rgba(34,197,94,.15)}
+.settings-row-icon.gold{background:rgba(245,197,24,.15)}
+.settings-row-icon.gray{background:var(--bg4)}
+.settings-row-info{flex:1;min-width:0}
+.settings-row-label{font-size:.86rem;font-weight:500}
+.settings-row-sub{font-size:.73rem;color:var(--text3);margin-top:.08rem}
+.settings-arrow{color:var(--text3);font-size:.8rem}
+
+/* Toggle */
+.toggle{
+  width:42px;height:24px;border-radius:12px;
+  background:var(--bg5);border:1px solid var(--b1);
+  position:relative;cursor:pointer;
+  transition:background .2s,border-color .2s;flex-shrink:0;
+}
+.toggle.on{background:var(--red);border-color:var(--red)}
+.toggle::after{
+  content:'';position:absolute;
+  top:2px;left:2px;width:18px;height:18px;
+  border-radius:50%;background:#fff;
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 1px 3px rgba(0,0,0,.3);
+}
+.toggle.on::after{transform:translateX(18px)}
+
+/* Custom playlists manager */
+.playlist-card{
+  display:flex;align-items:center;gap:.7rem;
+  padding:.7rem 1rem;
+  border-bottom:1px solid var(--b2);
+}
+.playlist-card-info{flex:1;min-width:0}
+.playlist-card-name{font-size:.85rem;font-weight:600}
+.playlist-card-url{
+  font-size:.7rem;color:var(--text3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:.1rem;
+}
+.playlist-card-loaded{
+  font-size:.65rem;font-weight:700;
+  color:var(--green);background:rgba(34,197,94,.1);
+  border:1px solid rgba(34,197,94,.2);
+  padding:.1rem .4rem;border-radius:4px;flex-shrink:0;
+}
+.playlist-del-btn{
+  width:28px;height:28px;border-radius:50%;
+  background:rgba(232,25,44,.1);border:1px solid rgba(232,25,44,.15);
+  color:var(--red);font-size:1rem;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .15s;flex-shrink:0;
+}
+.playlist-del-btn:hover{background:var(--red);color:#fff}
+
+/* Add playlist form */
+.add-playlist-form{
+  padding:.75rem 1rem;
+  display:flex;flex-direction:column;gap:.5rem;
+  border-top:1px solid var(--b1);
+}
+.add-pl-input{
+  padding:.5rem .75rem;
+  background:var(--bg3);border:1px solid var(--b1);border-radius:7px;
+  color:var(--text);font-size:.8rem;font-family:inherit;outline:none;
+}
+.add-pl-input:focus{border-color:rgba(232,25,44,.4)}
+.add-pl-input::placeholder{color:var(--text3)}
+.add-pl-btn{
+  padding:.5rem;background:var(--red);border:none;border-radius:7px;
+  color:#fff;font-size:.8rem;font-weight:700;font-family:inherit;cursor:pointer;
+  transition:opacity .15s;
+}
+.add-pl-btn:hover{opacity:.84}
+
+/* ══════════════════════════════════════
+   FAVORITES VIEW
+══════════════════════════════════════ */
+#viewFavorites{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+}
+.fav-video-area{flex-shrink:0}
+
+/* ══════════════════════════════════════
+   BOTTOM TAB BAR
+══════════════════════════════════════ */
+#tabbar{
+  display:flex;
+  height:var(--tab-h);
+  background:rgba(6,6,8,.95);
+  backdrop-filter:blur(20px) saturate(160%);
+  border-top:1px solid var(--b1);
+  flex-shrink:0;
+  padding-bottom:var(--sab);
+}
+.tab{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:.2rem;cursor:pointer;
+  color:var(--text3);
+  transition:color .18s;
+  padding:.2rem 0;
+  position:relative;
+}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--red)}
+.tab svg{width:20px;height:20px;flex-shrink:0}
+.tab span{font-size:.6rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.tab-indicator{
+  position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:24px;height:2px;border-radius:2px;
+  background:var(--red);
+  opacity:0;transition:opacity .18s;
+}
+.tab.active .tab-indicator{opacity:1}
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+#toast{
+  position:fixed;bottom:calc(var(--tab-h) + .8rem);
+  left:50%;transform:translateX(-50%) translateY(14px);
+  background:var(--bg4);border:1px solid var(--b1);
+  border-radius:100px;padding:.5rem 1.1rem;
+  font-size:.8rem;font-weight:500;
+  pointer-events:none;opacity:0;white-space:nowrap;
+  transition:all .22s cubic-bezier(.4,0,.2,1);
+  z-index:9999;max-width:90vw;
+  overflow:hidden;text-overflow:ellipsis;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ══════════════════════════════════════
+   MODAL (EPG info, settings panels)
+══════════════════════════════════════ */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.7);
+  backdrop-filter:blur(6px);
+  z-index:500;
+  opacity:0;pointer-events:none;
+  transition:opacity .22s;
+}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal-sheet{
+  position:absolute;bottom:0;left:0;right:0;
+  background:var(--bg2);
+  border-radius:16px 16px 0 0;
+  border-top:1px solid var(--b1);
+  transform:translateY(100%);
+  transition:transform .28s cubic-bezier(.4,0,.2,1);
+  max-height:75vh;
+  display:flex;flex-direction:column;
+  padding-bottom:var(--sab);
+}
+.modal-overlay.open .modal-sheet{transform:translateY(0)}
+.modal-handle{
+  width:36px;height:4px;border-radius:2px;
+  background:var(--bg5);margin:.75rem auto .5rem;flex-shrink:0;
+}
+.modal-title{
+  font-family:'Syne',sans-serif;
+  font-size:1rem;font-weight:700;
+  padding:.5rem 1rem .75rem;flex-shrink:0;
+  border-bottom:1px solid var(--b1);
+}
+.modal-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* ══════════════════════════════════════
+   CHANNEL INFO SHEET
+══════════════════════════════════════ */
+.ch-info-header{
+  display:flex;align-items:center;gap:.9rem;
+  padding:1rem;border-bottom:1px solid var(--b1);
+}
+.ch-info-logo{
+  width:56px;height:56px;border-radius:10px;
+  object-fit:contain;background:var(--bg4);padding:4px;
+}
+.ch-info-logo-ph{
+  width:56px;height:56px;border-radius:10px;
+  background:var(--bg4);border:1px solid var(--b1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;font-weight:700;color:var(--text2);
+}
+.ch-info-meta{flex:1}
+.ch-info-name{font-size:1rem;font-weight:700;margin-bottom:.2rem}
+.ch-info-group{font-size:.77rem;color:var(--text2)}
+.ch-info-actions{
+  display:flex;gap:.6rem;padding:1rem;
+}
+.ch-action-btn{
+  flex:1;padding:.65rem;border-radius:9px;
+  font-size:.82rem;font-weight:700;font-family:inherit;
+  cursor:pointer;transition:all .18s;border:none;
+  display:flex;align-items:center;justify-content:center;gap:.4rem;
+}
+.ch-action-play{background:var(--red);color:#fff}
+.ch-action-play:hover{background:var(--red2)}
+.ch-action-fav{background:var(--bg4);color:var(--text2);border:1px solid var(--b1)}
+.ch-action-fav:hover{background:var(--bg5);color:var(--text)}
+.ch-action-fav.active{color:var(--gold);border-color:rgba(245,197,24,.3);background:rgba(245,197,24,.08)}
+
+/* ══════════════════════════════════════
+   SEARCH RESULTS OVERLAY
+══════════════════════════════════════ */
+#searchOverlay{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  background:var(--bg);z-index:200;
+  display:none;flex-direction:column;
+}
+#searchOverlay.open{display:flex}
+.search-results-hd{
+  padding:.7rem .9rem .4rem;
+  font-size:.68rem;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);
+}
+.search-results-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* ══════════════════════════════════════
+   LANDSCAPE: side-by-side
+══════════════════════════════════════ */
+@media (orientation:landscape) {
+  #viewGuide{
+    flex-direction:row;
+  }
+  .player-panel{
+    flex:1;
+    display:flex;flex-direction:column;
+  }
+  .player-aspect{
+    flex:1;
+    aspect-ratio:unset;
+    max-height:none;
+  }
+  .guide-body-wrap{
+    width:260px;
+    flex-shrink:0;
+    display:flex;flex-direction:column;
+    border-left:1px solid var(--b1);
+    overflow:hidden;
+  }
+  .now-bar{
+    border-top:1px solid var(--b1);
+    flex-shrink:0;
+  }
+  .cat-strip{
+    display:none;
+  }
+}
+
+/* ══════════════════════════════════════
+   PROGRESS BAR (show progress)
+══════════════════════════════════════ */
+.prog-bar-wrap{
+  height:2px;background:var(--bg5);border-radius:1px;
+  overflow:hidden;margin-top:.35rem;
+}
+.prog-bar-fill{
+  height:100%;background:var(--red);border-radius:1px;
+  transition:width .3s;
+}
+
+/* ══════════════════════════════════════
+   ABOUT / INFO SECTION
+══════════════════════════════════════ */
+.about-card{
+  margin:1rem;border-radius:12px;
+  background:var(--bg3);border:1px solid var(--b1);
+  overflow:hidden;
+}
+.about-header{
+  padding:1.2rem;display:flex;align-items:center;gap:.8rem;
+  border-bottom:1px solid var(--b1);
+}
+.about-logo-wrap{
+  font-family:'Syne',sans-serif;font-weight:800;font-size:1.6rem;
+  letter-spacing:-.04em;
+}
+.about-meta{flex:1}
+.about-title{font-size:.9rem;font-weight:700}
+.about-version{font-size:.72rem;color:var(--text3);margin-top:.1rem}
+.about-desc{padding:.9rem 1.2rem;font-size:.8rem;color:var(--text2);line-height:1.7}
+
+/* ══════════════════════════════════════
+   QUALITY BADGE
+══════════════════════════════════════ */
+.quality-badge{
+  position:absolute;top:.5rem;right:.5rem;
+  font-size:.6rem;font-weight:700;letter-spacing:.07em;
+  padding:.18rem .45rem;border-radius:4px;
+  background:rgba(0,0,0,.6);border:1px solid var(--b1);
+  color:var(--text2);pointer-events:none;
+}
+
+/* ══════════════════════════════════════
+   LOADING CHANNEL SKELETON
+══════════════════════════════════════ */
+.ch-skeleton{
+  display:flex;align-items:center;gap:.65rem;
+  padding:.62rem .9rem;border-bottom:1px solid var(--b2);
+}
+.skel{
+  background:linear-gradient(90deg,var(--bg4) 25%,var(--bg5) 50%,var(--bg4) 75%);
+  background-size:200% 100%;
+  animation:shimmer 1.4s linear infinite;
+  border-radius:5px;
+}
+@keyframes shimmer{
+  0%{background-position:200% 0}
+  100%{background-position:-200% 0}
+}
+.skel-logo{width:38px;height:38px;border-radius:6px;flex-shrink:0}
+.skel-info{flex:1;display:flex;flex-direction:column;gap:.3rem}
+.skel-line1{height:10px;width:60%;border-radius:3px}
+.skel-line2{height:8px;width:40%;border-radius:3px}
+
+/* ══════════════════════════════════════
+   EPG MINI GRID (guide strip)
+══════════════════════════════════════ */
+.epg-strip{
+  padding:.5rem .9rem;
+  background:var(--bg2);
+  border-bottom:1px solid var(--b1);
+  display:none; /* shown only when EPG data exists */
+}
+
+/* ══════════════════════════════════════
+   FILTER / GROUP HEADER
+══════════════════════════════════════ */
+.group-header{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.42rem .9rem;
+  background:var(--bg3);
+  border-bottom:1px solid var(--b2);
+  cursor:pointer;
+}
+.group-header-name{
+  flex:1;font-size:.74rem;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--text2);
+}
+.group-count{
+  font-size:.66rem;color:var(--text3);
+  background:var(--bg4);padding:.1rem .38rem;border-radius:3px;
+}
+.group-chevron{color:var(--text3);font-size:.7rem;transition:transform .2s}
+.group-header.collapsed .group-chevron{transform:rotate(-90deg)}
+
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── TOP NAV ── -->
+  <div id="topbar">
+    <div class="logo">
+      <span class="logo-a">A</span><span class="logo-live">Live</span>
+    </div>
+    <div class="live-dot" id="globalLiveDot" style="display:none"></div>
+
+    <div class="nav-spacer"></div>
+
+    <!-- Search -->
+    <div class="search-wrap" id="searchWrap">
+      <div class="search-bar" id="searchBar">
+        <input type="text" id="searchInput" placeholder="Search channels…" autocomplete="off" spellcheck="false">
+        <button class="search-x" id="searchX" onclick="clearSearch()">×</button>
+      </div>
+      <button class="icon-btn" id="searchBtn" onclick="toggleSearch()" title="Search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+    </div>
+
+    <!-- Favorites toggle -->
+    <button class="icon-btn" id="favBtn" onclick="navTab('favorites')" title="Favorites">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    </button>
+  </div>
+
+  <!-- ── CONTENT ── -->
+  <div id="content">
+
+    <!-- Search Overlay -->
+    <div id="searchOverlay">
+      <div class="search-results-hd" id="searchResultsHd">Results</div>
+      <div class="search-results-list" id="searchResultsList"></div>
+    </div>
+
+    <!-- ══ VIEW: GUIDE ══ -->
+    <div class="view active" id="viewGuide">
+
+      <!-- Playlist Set Selector -->
+      <div class="sets-strip" id="setsStrip"></div>
+
+      <!-- Custom URL Bar -->
+      <div class="url-bar" id="urlBar">
+        <input class="url-input" id="urlInput" type="text" placeholder="Paste M3U playlist or stream URL…" autocomplete="off" spellcheck="false">
+        <button class="url-load-btn" onclick="loadFromInput()">▶ Load</button>
+      </div>
+
+      <!-- Category Tabs -->
+      <div class="cat-strip" id="catStrip">
+        <div class="cat-pill active" data-cat="all" onclick="selectCat('all')">All</div>
+      </div>
+
+      <!-- Player + channel list -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden" id="guideLayout">
+
+        <!-- Player Panel -->
+        <div class="player-panel" id="playerPanel">
+          <div class="player-aspect">
+            <video id="liveVideo" controls playsinline webkit-playsinline></video>
+            <div class="player-overlay" id="playerOverlay">
+              <div class="player-overlay-icon">📡</div>
+              <div class="player-overlay-msg">Select a channel to start<br>watching live TV</div>
+            </div>
+            <div class="quality-badge" id="qualityBadge" style="display:none">HLS</div>
+          </div>
+          <!-- Now Playing Bar -->
+          <div class="now-bar" id="nowBar" style="display:none">
+            <div id="nowLogo"></div>
+            <div class="now-info">
+              <div class="now-ch-name" id="nowName">—</div>
+              <div class="now-prog" id="nowProg">Live</div>
+            </div>
+            <div class="now-badge"><div class="now-dot"></div>LIVE</div>
+          </div>
+        </div>
+
+        <!-- Guide body wrapper (for landscape layout) -->
+        <div class="guide-body-wrap" id="guideBodyWrap" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+          <!-- Channel List -->
+          <div class="guide-body" id="channelList">
+            <div class="empty-state">
+              <div class="empty-icon">📺</div>
+              <div class="empty-title">No channels loaded</div>
+              <div class="empty-sub">Select a playlist set above, paste an M3U URL, or add your own channels in Settings.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ VIEW: FAVORITES ══ -->
+    <div class="view" id="viewFavorites">
+      <div class="player-panel fav-video-area" id="favPlayerPanel">
+        <div class="player-aspect">
+          <video id="favVideo" controls playsinline webkit-playsinline></video>
+          <div class="player-overlay" id="favOverlay">
+            <div class="player-overlay-icon">⭐</div>
+            <div class="player-overlay-msg">Select a favorite channel<br>to start watching</div>
+          </div>
+        </div>
+        <div class="now-bar" id="favNowBar" style="display:none">
+          <div id="favNowLogo"></div>
+          <div class="now-info">
+            <div class="now-ch-name" id="favNowName">—</div>
+            <div class="now-prog">Live</div>
+          </div>
+          <div class="now-badge"><div class="now-dot"></div>LIVE</div>
+        </div>
+      </div>
+      <div class="guide-section-hd">Favorite Channels</div>
+      <div class="guide-body" id="favList">
+        <div class="empty-state">
+          <div class="empty-icon">⭐</div>
+          <div class="empty-title">No favorites yet</div>
+          <div class="empty-sub">Tap the star on any channel to add it here for quick access.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ VIEW: SETTINGS ══ -->
+    <div class="view" id="viewSettings">
+      <div class="settings-body">
+
+        <!-- Playback -->
+        <div class="settings-section">
+          <div class="settings-section-title">Playback</div>
+          <div class="settings-row" onclick="toggleSetting('lowLatency')">
+            <div class="settings-row-icon red">⚡</div>
+            <div class="settings-row-info">
+              <div class="settings-row-label">Low Latency Mode</div>
+              <div class="settings-row-sub">Reduces stream delay for live content</div>
+            </div>
+            <div class="toggle" id="tog-lowLatency"></div>
+          </div>
+          <div class="settings-row" onclick="toggleSetting('autoPlay')">
+            <div class="settings-row-icon green">▶</div>
+            <div class="settings-row-info">
+              <div class="settings-row-label">Auto-Play on Select</div>
+              <div class="settings-row-sub">Start playing immediately when you tap a channel</div>
+            </div>
+            <div class="toggle" id="tog-autoPlay"></div>
+          </div>
+          <div class="settings-row" onclick="toggleSetting('hardwareAccel')">
+            <div class="settings-row-icon blue">🎮</div>
+            <div class="settings-row-info">
+              <div class="settings-row-label">Hardware Acceleration</div>
+              <div class="settings-row-sub">Use GPU for smoother video decoding</div>
+            </div>
+            <div class="toggle" id="tog-hardwareAccel"></div>
+          </div>
+          <div class="settings-row" onclick="toggleSetting('rememberChannel')">
+            <div class="settings-row-icon gold">💾</div>
+            <div class="settings-row-info">
+              <div class="settings-row-label">Remember Last Channel</div>
+              <div class="settings-row-sub">Resume last watched channel on open</div>
+            </div>
+            <div class="toggle" id="tog-rememberChannel"></div>
+          </div>
+        </div>
+
+        <!-- UI Preferences -->
+        <div class="settings-section">
+          <div class="settings-section-title">Interface</div>
+          <div class="settings-row" onclick="toggleSetting('showChannelNumbers')">
+            <div class="settings-row-icon gray">🔢</div>
+            <div class="settings-row-info">
+              <div class="settings-row-label">Show Channel Numbers</div>
+              <div class="settings-row-sub">Display channel number next to each entry</div>
+            </div>
+            <div class="toggle" id="tog-showChannelNumbers"></div>
+          </div>
+          <div class="settings-row" onclick="toggleSetting('groupByCategory')">
+            <div class="settings-row-icon blue">📂</div>
+            <div class="settings-row-info">
+              <div class="settings-row-label">Group by Category</div>
+              <div class="settings-row-sub">Organize channels by their group tag</div>
+            </div>
+            <div class="toggle" id="tog-groupByCategory"></div>
+          </div>
+          <div class="settings-row" onclick="toggleSetting('showLogos')">
+            <div class="settings-row-icon green">🖼</div>
+            <div class="settings-row-info">
+              <div class="settings-row-label">Show Channel Logos</div>
+              <div class="settings-row-sub">Load and display channel artwork</div>
+            </div>
+            <div class="toggle" id="tog-showLogos"></div>
+          </div>
+        </div>
+
+        <!-- Playlists -->
+        <div class="settings-section">
+          <div class="settings-section-title">My Playlists</div>
+          <div id="customPlaylistsList"></div>
+          <div class="add-playlist-form">
+            <input class="add-pl-input" id="newPlName" placeholder="Playlist name (e.g. My Sports)">
+            <input class="add-pl-input" id="newPlUrl" placeholder="M3U playlist URL or stream URL">
+            <button class="add-pl-btn" onclick="addCustomPlaylist()">+ Add Playlist</button>
+          </div>
+        </div>
+
+        <!-- Data -->
+        <div class="settings-section">
+          <div class="settings-section-title">Data</div>
+          <div class="settings-row" onclick="clearFavorites()">
+            <div class="settings-row-icon red">🗑</div>
+            <div class="settings-row-info">
+              <div class="settings-row-label">Clear Favorites</div>
+              <div class="settings-row-sub">Remove all favorited channels</div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+          <div class="settings-row" onclick="clearAllData()">
+            <div class="settings-row-icon red">⚠️</div>
+            <div class="settings-row-info">
+              <div class="settings-row-label">Reset All Data</div>
+              <div class="settings-row-sub">Clear all playlists, favorites and settings</div>
+            </div>
+            <span class="settings-arrow">›</span>
+          </div>
+        </div>
+
+        <!-- About -->
+        <div class="about-card">
+          <div class="about-header">
+            <div class="about-logo-wrap">
+              <span style="color:var(--text)">A</span><span style="color:var(--red)">Live</span>
+            </div>
+            <div class="about-meta">
+              <div class="about-title">ALive — Live TV</div>
+              <div class="about-version">v1.0  •  Part of the AFlix Suite</div>
+            </div>
+          </div>
+          <div class="about-desc">
+            ALive is a free, open PWA live TV player. It supports M3U playlists, direct HLS/TS streams, and multiple channel sets from public community sources. No account required. Works offline after first load.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- ── BOTTOM TAB BAR ── -->
+  <div id="tabbar">
+    <div class="tab active" id="tab-guide" onclick="navTab('guide')">
+      <div class="tab-indicator"></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <span>Guide</span>
+    </div>
+    <div class="tab" id="tab-favorites" onclick="navTab('favorites')">
+      <div class="tab-indicator"></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span>Favorites</span>
+    </div>
+    <div class="tab" id="tab-settings" onclick="navTab('settings')">
+      <div class="tab-indicator"></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+      <span>Settings</span>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Channel Info Sheet -->
+<div class="modal-overlay" id="chInfoOverlay" onclick="closeChInfo(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-body" id="chInfoBody"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- HLS.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
+
+<script>
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+const ST = {
+  channels: [],      // full loaded list
+  filtered: [],      // after cat/search filter
+  favorites: new Set(),
+  activeIdx: -1,
+  activeSet: null,
+  activeGroup: 'all',
+  hls: null,
+  favHls: null,
+  currentView: 'guide',
+  searchOpen: false,
+  settings: {
+    lowLatency: true,
+    autoPlay: true,
+    hardwareAccel: true,
+    rememberChannel: true,
+    showChannelNumbers: true,
+    groupByCategory: false,
+    showLogos: true,
+  },
+  customPlaylists: [], // [{name, url}]
+};
+
+/* ══════════════════════════════════════════
+   BUILT-IN PLAYLIST SETS
+══════════════════════════════════════════ */
+const PLAYLIST_SETS = [
+  {
+    id: 'free-tv',
+    name: 'Free TV',
+    emoji: '📺',
+    url: 'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8',
+    desc: 'Free broadcast channels worldwide (curated, HD)'
+  },
+  {
+    id: 'iptv-org-us',
+    name: 'US Channels',
+    emoji: '🇺🇸',
+    url: 'https://iptv-org.github.io/iptv/countries/us.m3u',
+    desc: 'United States public channels from iptv-org'
+  },
+  {
+    id: 'iptv-org-news',
+    name: 'News',
+    emoji: '📰',
+    url: 'https://iptv-org.github.io/iptv/categories/news.m3u',
+    desc: 'Global news channels'
+  },
+  {
+    id: 'iptv-org-sports',
+    name: 'Sports',
+    emoji: '⚽',
+    url: 'https://iptv-org.github.io/iptv/categories/sports.m3u',
+    desc: 'Sports channels worldwide'
+  },
+  {
+    id: 'iptv-org-music',
+    name: 'Music',
+    emoji: '🎵',
+    url: 'https://iptv-org.github.io/iptv/categories/music.m3u',
+    desc: 'Music TV channels'
+  },
+  {
+    id: 'iptv-org-kids',
+    name: 'Kids',
+    emoji: '🧒',
+    url: 'https://iptv-org.github.io/iptv/categories/kids.m3u',
+    desc: 'Family & children channels'
+  },
+  {
+    id: 'iptv-org-docu',
+    name: 'Docs',
+    emoji: '🎬',
+    url: 'https://iptv-org.github.io/iptv/categories/documentary.m3u',
+    desc: 'Documentary & factual channels'
+  },
+  {
+    id: 'iptv-org-movies',
+    name: 'Movies',
+    emoji: '🎥',
+    url: 'https://iptv-org.github.io/iptv/categories/movies.m3u',
+    desc: 'Movie channels'
+  },
+  {
+    id: 'iptv-org-religion',
+    name: 'Religious',
+    emoji: '🙏',
+    url: 'https://iptv-org.github.io/iptv/categories/religious.m3u',
+    desc: 'Religious & faith-based channels'
+  },
+  {
+    id: 'iptv-org-uk',
+    name: 'UK',
+    emoji: '🇬🇧',
+    url: 'https://iptv-org.github.io/iptv/countries/gb.m3u',
+    desc: 'United Kingdom channels'
+  },
+  {
+    id: 'iptv-org-de',
+    name: 'Germany',
+    emoji: '🇩🇪',
+    url: 'https://iptv-org.github.io/iptv/countries/de.m3u',
+    desc: 'German channels'
+  },
+  {
+    id: 'iptv-org-fr',
+    name: 'France',
+    emoji: '🇫🇷',
+    url: 'https://iptv-org.github.io/iptv/countries/fr.m3u',
+    desc: 'French channels'
+  },
+  {
+    id: 'iptv-org-es',
+    name: 'Spanish',
+    emoji: '🇪🇸',
+    url: 'https://iptv-org.github.io/iptv/countries/es.m3u',
+    desc: 'Spanish language channels'
+  },
+  {
+    id: 'iptv-org-in',
+    name: 'India',
+    emoji: '🇮🇳',
+    url: 'https://iptv-org.github.io/iptv/countries/in.m3u',
+    desc: 'Indian channels'
+  },
+];
+
+/* ══════════════════════════════════════════
+   STORAGE
+══════════════════════════════════════════ */
+function saveData() {
+  try {
+    localStorage.setItem('alive_favorites', JSON.stringify([...ST.favorites]));
+    localStorage.setItem('alive_settings', JSON.stringify(ST.settings));
+    localStorage.setItem('alive_customPlaylists', JSON.stringify(ST.customPlaylists));
+    if (ST.settings.rememberChannel && ST.activeIdx >= 0) {
+      const ch = ST.channels[ST.activeIdx];
+      if (ch) localStorage.setItem('alive_lastChannel', JSON.stringify({name: ch.name, url: ch.url, logo: ch.logo, group: ch.group}));
+    }
+  } catch(e) {}
+}
+function loadData() {
+  try {
+    const favs = JSON.parse(localStorage.getItem('alive_favorites') || '[]');
+    ST.favorites = new Set(favs);
+    const sett = JSON.parse(localStorage.getItem('alive_settings') || '{}');
+    Object.assign(ST.settings, sett);
+    ST.customPlaylists = JSON.parse(localStorage.getItem('alive_customPlaylists') || '[]');
+  } catch(e) {}
+}
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+function init() {
+  loadData();
+  renderSets();
+  renderSettings();
+  renderCustomPlaylists();
+  renderFavList();
+
+  // Search events
+  document.getElementById('searchInput').addEventListener('input', e => {
+    const q = e.target.value.trim();
+    document.getElementById('searchX').classList.toggle('show', q.length > 0);
+    showSearchResults(q);
+  });
+  document.getElementById('urlInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') loadFromInput();
+  });
+
+  // Try resume last channel
+  if (ST.settings.rememberChannel) {
+    try {
+      const last = JSON.parse(localStorage.getItem('alive_lastChannel') || 'null');
+      if (last && last.url) {
+        // Auto-resume silently after brief delay
+        setTimeout(() => {
+          // Load first set automatically
+          loadSet(PLAYLIST_SETS[0]);
+        }, 300);
+      }
+    } catch(e) {}
+  } else {
+    // Load first set automatically for best UX
+    setTimeout(() => loadSet(PLAYLIST_SETS[0]), 300);
+  }
+}
+
+/* ══════════════════════════════════════════
+   SETS RENDERER
+══════════════════════════════════════════ */
+function renderSets() {
+  const strip = document.getElementById('setsStrip');
+  const allSets = [...PLAYLIST_SETS, ...ST.customPlaylists.map((p,i) => ({
+    id: 'custom_' + i, name: p.name, emoji: '📋', url: p.url, desc: 'Custom playlist'
+  }))];
+  strip.innerHTML = allSets.map(s =>
+    `<div class="set-pill${ST.activeSet === s.id ? ' active' : ''}" id="set-${s.id}" onclick="loadSet(${JSON.stringify(s).replace(/"/g,'&quot;')})" title="${s.desc}">
+      <span>${s.emoji}</span> ${s.name}
+      <span class="set-status" id="setstatus-${s.id}"></span>
+    </div>`
+  ).join('');
+}
+
+/* ══════════════════════════════════════════
+   LOAD SET
+══════════════════════════════════════════ */
+async function loadSet(set) {
+  ST.activeSet = set.id;
+  renderSets();
+  await loadM3U(set.url);
+}
+
+/* ══════════════════════════════════════════
+   LOAD FROM URL INPUT
+══════════════════════════════════════════ */
+async function loadFromInput() {
+  const raw = document.getElementById('urlInput').value.trim();
+  if (!raw) return;
+  ST.activeSet = null;
+  renderSets();
+  await loadM3U(raw);
+}
+
+/* ══════════════════════════════════════════
+   M3U LOADER
+══════════════════════════════════════════ */
+async function loadM3U(raw) {
+  if (!raw) return;
+
+  const listEl = document.getElementById('channelList');
+
+  // Is it a direct stream URL?
+  const lc = raw.toLowerCase();
+  const isM3UFile = lc.includes('.m3u') && !lc.endsWith('.m3u8');
+  const isDirectHLS = lc.includes('.m3u8');
+  const isDirectTS = lc.includes('.ts');
+  const hasQuery = raw.includes('?') && (lc.includes('type=m3u') || lc.includes('output=m3u') || lc.includes('/get.php') || lc.includes('playlist'));
+
+  if ((isDirectHLS || isDirectTS) && !isM3UFile && !hasQuery) {
+    // Direct stream
+    const fakeCh = { name: 'Direct Stream', url: raw, logo: '', group: 'Direct', number: 1 };
+    ST.channels = [fakeCh];
+    ST.filtered = [fakeCh];
+    ST.activeGroup = 'all';
+    renderCatStrip();
+    renderChannelList();
+    playChannel(0);
+    return;
+  }
+
+  // Show skeleton loading
+  listEl.innerHTML = skeletons(8);
+
+  let text = '';
+  try {
+    const r = await fetch(raw);
+    if (!r.ok) throw new Error(r.status);
+    text = await r.text();
+  } catch(e) {
+    // CORS proxy fallback
+    try {
+      const proxy = `https://corsproxy.io/?${encodeURIComponent(raw)}`;
+      const r2 = await fetch(proxy);
+      if (!r2.ok) throw new Error(r2.status);
+      text = await r2.text();
+    } catch(e2) {
+      listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Failed to load</div><div class="empty-sub">Could not reach the playlist URL.<br>Check your connection or try a different source.<br><small style="opacity:.5">${e2}</small></div></div>`;
+      return;
+    }
+  }
+
+  ST.channels = parseM3U(text);
+
+  if (!ST.channels.length) {
+    listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">No channels found</div><div class="empty-sub">The playlist loaded but contained no valid channels.</div></div>`;
+    return;
+  }
+
+  ST.filtered = [...ST.channels];
+  ST.activeGroup = 'all';
+  // Mark set as loaded
+  if (ST.activeSet) {
+    const statusEl = document.getElementById(`setstatus-${ST.activeSet}`);
+    if (statusEl) statusEl.style.background = 'var(--green)';
+    const pill = document.getElementById(`set-${ST.activeSet}`);
+    if (pill) pill.classList.add('loaded');
+  }
+
+  renderCatStrip();
+  renderChannelList();
+  toast(`✓ Loaded ${ST.channels.length} channels`);
+
+  // Auto resume last channel
+  if (ST.settings.rememberChannel) {
+    try {
+      const last = JSON.parse(localStorage.getItem('alive_lastChannel') || 'null');
+      if (last && last.url) {
+        const idx = ST.channels.findIndex(c => c.url === last.url);
+        if (idx >= 0) {
+          setTimeout(() => playChannel(idx), 400);
+        }
+      }
+    } catch(e) {}
+  }
+}
+
+/* ══════════════════════════════════════════
+   M3U PARSER
+══════════════════════════════════════════ */
+function parseM3U(text) {
+  const lines = text.split('\n');
+  const channels = [];
+  let meta = null;
+  let num = 1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('#EXTINF')) {
+      const name  = line.includes(',') ? line.split(',').slice(1).join(',').trim() : 'Channel ' + num;
+      const logo  = (line.match(/tvg-logo="([^"]*)"/) || [])[1] || '';
+      const group = (line.match(/group-title="([^"]*)"/) || [])[1] || 'General';
+      const tvgNum = (line.match(/tvg-chno="([^"]*)"/) || [])[1] || '';
+      const tvgId  = (line.match(/tvg-id="([^"]*)"/) || [])[1] || '';
+      meta = { name, logo, group, number: tvgNum ? parseInt(tvgNum) : num, tvgId };
+    } else if (line && !line.startsWith('#') && meta) {
+      channels.push({ ...meta, url: line });
+      meta = null;
+      num++;
+    }
+  }
+  return channels;
+}
+
+/* ══════════════════════════════════════════
+   CATEGORY STRIP
+══════════════════════════════════════════ */
+function renderCatStrip() {
+  const groups = ['all', ...new Set(ST.channels.map(c => c.group).filter(Boolean).sort())];
+  const strip = document.getElementById('catStrip');
+  strip.innerHTML = groups.map(g =>
+    `<div class="cat-pill${ST.activeGroup === g ? ' active' : ''}" onclick="selectCat('${esc(g)}')">${g === 'all' ? 'All' : g}</div>`
+  ).join('');
+}
+
+function selectCat(cat) {
+  ST.activeGroup = cat;
+  ST.filtered = cat === 'all' ? [...ST.channels] : ST.channels.filter(c => c.group === cat);
+  document.querySelectorAll('.cat-pill').forEach(p => {
+    p.classList.toggle('active', p.textContent.trim() === (cat === 'all' ? 'All' : cat));
+  });
+  renderChannelList();
+}
+
+/* ══════════════════════════════════════════
+   CHANNEL LIST RENDERER
+══════════════════════════════════════════ */
+function renderChannelList(targetEl, channels, activeIdx, onPlay) {
+  const el = targetEl || document.getElementById('channelList');
+  const chs = channels || ST.filtered;
+  const aIdx = activeIdx !== undefined ? activeIdx : ST.activeIdx;
+  const playFn = onPlay || playChannel;
+
+  if (!chs.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No channels</div><div class="empty-sub">No channels match your filter.</div></div>`;
+    return;
+  }
+
+  if (ST.settings.groupByCategory && !targetEl) {
+    renderChannelListGrouped(el, chs, aIdx, playFn);
+    return;
+  }
+
+  el.innerHTML = chs.map((ch, i) => {
+    const realIdx = ST.channels.indexOf(ch);
+    const isActive = realIdx === aIdx;
+    const isFav = ST.favorites.has(ch.url);
+    return chRowHTML(ch, realIdx, isActive, isFav, playFn);
+  }).join('');
+}
+
+function renderChannelListGrouped(el, chs, aIdx, playFn) {
+  const groups = {};
+  chs.forEach(ch => {
+    const g = ch.group || 'General';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(ch);
+  });
+  el.innerHTML = Object.keys(groups).sort().map(g => {
+    const rows = groups[g].map(ch => {
+      const realIdx = ST.channels.indexOf(ch);
+      const isActive = realIdx === aIdx;
+      const isFav = ST.favorites.has(ch.url);
+      return chRowHTML(ch, realIdx, isActive, isFav, playFn);
+    }).join('');
+    return `<div class="guide-section-hd">${esc(g)} <span style="font-weight:400;color:var(--text3)">(${groups[g].length})</span></div>${rows}`;
+  }).join('');
+}
+
+function chRowHTML(ch, realIdx, isActive, isFav, playFn) {
+  const logoHtml = ST.settings.showLogos && ch.logo
+    ? `<img class="ch-logo" src="${esc(ch.logo)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+    : '';
+  const phStyle = (ST.settings.showLogos && ch.logo) ? 'style="display:none"' : '';
+  const abbr = ch.name.replace(/[^A-Z0-9]/gi,'').slice(0,3).toUpperCase() || '?';
+
+  return `<div class="ch-row${isActive?' active':''}" onclick="playChannel(${realIdx})">
+    ${ST.settings.showChannelNumbers ? `<div class="ch-num">${ch.number||''}</div>` : ''}
+    ${logoHtml}<div class="ch-logo-ph" ${phStyle}>${abbr}</div>
+    <div class="ch-info">
+      <div class="ch-name">${esc(ch.name)}</div>
+      <div class="ch-prog">${esc(ch.group||'')}</div>
+    </div>
+    <button class="ch-fav${isFav?' active':''}" onclick="event.stopPropagation();toggleFav('${esc(ch.url)}',this)" title="${isFav?'Remove from favorites':'Add to favorites'}">${isFav?'★':'☆'}</button>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════
+   PLAY CHANNEL
+══════════════════════════════════════════ */
+function playChannel(idx, targetVideo, targetHlsProp) {
+  const ch = ST.channels[idx];
+  if (!ch) return;
+
+  const videoProp = targetVideo || 'liveVideo';
+  const hlsProp = targetHlsProp || 'hls';
+  const isMain = hlsProp === 'hls';
+
+  if (isMain) {
+    ST.activeIdx = idx;
+    renderChannelList();
+    updateNowBar(ch);
+    document.getElementById('globalLiveDot').style.display = '';
+  }
+
+  stopHLS(hlsProp);
+
+  const video = document.getElementById(videoProp);
+  if (!video) return;
+
+  const url = ch.url;
+
+  // Decide strategy
+  const lc = url.toLowerCase();
+  const isHLS = lc.includes('.m3u8') || lc.includes('hls') || lc.includes('/live') || lc.includes('stream') || lc.includes('/ts') || lc.includes('.ts') || (!lc.includes('.'));
+
+  if (typeof Hls !== 'undefined' && Hls.isSupported() && isHLS) {
+    const hls = new Hls({
+      enableWorker: ST.settings.hardwareAccel,
+      lowLatencyMode: ST.settings.lowLatency,
+      backBufferLength: 30,
+      maxBufferLength: 30,
+    });
+    ST[hlsProp] = hls;
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.play().catch(() => {});
+      if (isMain) {
+        document.getElementById('playerOverlay').classList.add('hidden');
+        document.getElementById('qualityBadge').style.display = '';
+        document.getElementById('qualityBadge').textContent = 'HLS';
+      }
+    });
+    hls.on(Hls.Events.ERROR, (_, data) => {
+      if (data.fatal) {
+        video.src = url;
+        video.play().catch(() => {});
+      }
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari native HLS
+    video.src = url;
+    video.play().catch(() => {});
+    if (isMain) {
+      document.getElementById('playerOverlay').classList.add('hidden');
+      document.getElementById('qualityBadge').style.display = '';
+      document.getElementById('qualityBadge').textContent = 'HLS';
+    }
+  } else {
+    video.src = url;
+    video.play().catch(() => {});
+    if (isMain) {
+      document.getElementById('playerOverlay').classList.add('hidden');
+      document.getElementById('qualityBadge').style.display = '';
+      document.getElementById('qualityBadge').textContent = 'Live';
+    }
+  }
+
+  saveData();
+
+  // Scroll into view
+  setTimeout(() => {
+    document.querySelector('.ch-row.active')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 50);
+}
+
+function stopHLS(prop) {
+  const h = ST[prop];
+  if (h) { try { h.destroy(); } catch(e) {} ST[prop] = null; }
+}
+
+/* ══════════════════════════════════════════
+   NOW BAR
+══════════════════════════════════════════ */
+function updateNowBar(ch) {
+  const bar = document.getElementById('nowBar');
+  bar.style.display = '';
+  document.getElementById('nowName').textContent = ch.name;
+  document.getElementById('nowProg').textContent = ch.group || 'Live';
+
+  const logoWrap = document.getElementById('nowLogo');
+  if (ST.settings.showLogos && ch.logo) {
+    logoWrap.innerHTML = `<img class="now-ch-logo" src="${esc(ch.logo)}" alt="" onerror="this.style.display='none'">`;
+  } else {
+    const abbr = ch.name.replace(/[^A-Z0-9]/gi,'').slice(0,2).toUpperCase() || '?';
+    logoWrap.innerHTML = `<div class="now-ch-logo-ph">${abbr}</div>`;
+  }
+}
+
+/* ══════════════════════════════════════════
+   FAVORITES
+══════════════════════════════════════════ */
+function toggleFav(url, btn) {
+  if (ST.favorites.has(url)) {
+    ST.favorites.delete(url);
+    btn.classList.remove('active');
+    btn.textContent = '☆';
+    toast('Removed from favorites');
+  } else {
+    ST.favorites.add(url);
+    btn.classList.add('active');
+    btn.textContent = '★';
+    toast('⭐ Added to favorites');
+  }
+  saveData();
+  renderFavList();
+}
+
+function renderFavList() {
+  const el = document.getElementById('favList');
+  const favChannels = ST.channels.filter(c => ST.favorites.has(c.url));
+
+  if (!favChannels.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><div class="empty-title">No favorites yet</div><div class="empty-sub">Tap the star ☆ on any channel to add it here.</div></div>`;
+    return;
+  }
+
+  el.innerHTML = favChannels.map((ch, i) => {
+    const realIdx = ST.channels.indexOf(ch);
+    return `<div class="ch-row${realIdx === ST.activeIdx?' active':''}" onclick="playFav(${realIdx})">
+      ${ST.settings.showLogos && ch.logo ? `<img class="ch-logo" src="${esc(ch.logo)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
+      <div class="ch-logo-ph"${ST.settings.showLogos && ch.logo ? ' style="display:none"' : ''}>${ch.name.replace(/[^A-Z0-9]/gi,'').slice(0,3).toUpperCase()||'?'}</div>
+      <div class="ch-info"><div class="ch-name">${esc(ch.name)}</div><div class="ch-prog">${esc(ch.group||'')}</div></div>
+      <button class="ch-fav active" onclick="event.stopPropagation();removeFav('${esc(ch.url)}')" title="Remove">★</button>
+    </div>`;
+  }).join('');
+}
+
+function playFav(idx) {
+  // Play in main guide player and also mark active
+  playChannel(idx);
+  // Update fav view now bar
+  const ch = ST.channels[idx];
+  if (!ch) return;
+  const bar = document.getElementById('favNowBar');
+  bar.style.display = '';
+  document.getElementById('favNowName').textContent = ch.name;
+  const logoWrap = document.getElementById('favNowLogo');
+  if (ST.settings.showLogos && ch.logo) {
+    logoWrap.innerHTML = `<img class="now-ch-logo" src="${esc(ch.logo)}" alt="" onerror="this.style.display='none'">`;
+  } else {
+    logoWrap.innerHTML = `<div class="now-ch-logo-ph">${ch.name.replace(/[^A-Z]/gi,'').slice(0,2)||'?'}</div>`;
+  }
+}
+
+function removeFav(url) {
+  ST.favorites.delete(url);
+  saveData();
+  renderFavList();
+  // Re-render guide too
+  renderChannelList();
+  toast('Removed from favorites');
+}
+
+function clearFavorites() {
+  if (!confirm('Clear all favorites?')) return;
+  ST.favorites.clear();
+  saveData();
+  renderFavList();
+  renderChannelList();
+  toast('Favorites cleared');
+}
+
+/* ══════════════════════════════════════════
+   SEARCH
+══════════════════════════════════════════ */
+function toggleSearch() {
+  ST.searchOpen = !ST.searchOpen;
+  const wrap = document.getElementById('searchWrap');
+  const bar = document.getElementById('searchBar');
+  wrap.classList.toggle('open', ST.searchOpen);
+  bar.classList.toggle('open', ST.searchOpen);
+  const overlay = document.getElementById('searchOverlay');
+  if (!ST.searchOpen) {
+    overlay.classList.remove('open');
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchX').classList.remove('show');
+  } else {
+    setTimeout(() => document.getElementById('searchInput').focus(), 50);
+  }
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchX').classList.remove('show');
+  document.getElementById('searchOverlay').classList.remove('open');
+  document.getElementById('searchInput').focus();
+}
+
+function showSearchResults(q) {
+  const overlay = document.getElementById('searchOverlay');
+  const list = document.getElementById('searchResultsList');
+  const hd = document.getElementById('searchResultsHd');
+  if (!q) { overlay.classList.remove('open'); return; }
+  overlay.classList.add('open');
+
+  const ql = q.toLowerCase();
+  const results = ST.channels.filter(c =>
+    c.name.toLowerCase().includes(ql) || (c.group||'').toLowerCase().includes(ql)
+  ).slice(0, 40);
+
+  hd.textContent = `${results.length} result${results.length !== 1 ? 's' : ''} for "${q}"`;
+
+  if (!results.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No results</div><div class="empty-sub">Try a different search term.</div></div>`;
+    return;
+  }
+
+  list.innerHTML = results.map(ch => {
+    const realIdx = ST.channels.indexOf(ch);
+    const isFav = ST.favorites.has(ch.url);
+    return chRowHTML(ch, realIdx, realIdx === ST.activeIdx, isFav, (idx) => {
+      playChannel(idx);
+      overlay.classList.remove('open');
+      document.getElementById('searchInput').value = '';
+      document.getElementById('searchX').classList.remove('show');
+      ST.searchOpen = false;
+      document.getElementById('searchWrap').classList.remove('open');
+      document.getElementById('searchBar').classList.remove('open');
+    });
+  }).join('');
+}
+
+/* ══════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════ */
+function navTab(view) {
+  ST.currentView = view;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`view${view.charAt(0).toUpperCase() + view.slice(1)}`).classList.add('active');
+  document.getElementById(`tab-${view}`).classList.add('active');
+
+  if (view === 'favorites') renderFavList();
+  if (view === 'settings') { renderSettings(); renderCustomPlaylists(); }
+}
+
+/* ══════════════════════════════════════════
+   SETTINGS
+══════════════════════════════════════════ */
+function renderSettings() {
+  Object.keys(ST.settings).forEach(key => {
+    const tog = document.getElementById('tog-' + key);
+    if (tog) tog.classList.toggle('on', ST.settings[key]);
+  });
+}
+
+function toggleSetting(key) {
+  ST.settings[key] = !ST.settings[key];
+  const tog = document.getElementById('tog-' + key);
+  if (tog) tog.classList.toggle('on', ST.settings[key]);
+  saveData();
+  // Apply immediately
+  if (key === 'groupByCategory' || key === 'showChannelNumbers' || key === 'showLogos') {
+    renderChannelList();
+    renderFavList();
+  }
+  toast(ST.settings[key] ? '✓ Enabled' : 'Disabled');
+}
+
+/* ══════════════════════════════════════════
+   CUSTOM PLAYLISTS
+══════════════════════════════════════════ */
+function renderCustomPlaylists() {
+  const el = document.getElementById('customPlaylistsList');
+  if (!ST.customPlaylists.length) {
+    el.innerHTML = `<div style="padding:.7rem 1rem;font-size:.78rem;color:var(--text3)">No custom playlists yet. Add one below.</div>`;
+    return;
+  }
+  el.innerHTML = ST.customPlaylists.map((p, i) =>
+    `<div class="playlist-card">
+      <div class="playlist-card-info">
+        <div class="playlist-card-name">${esc(p.name)}</div>
+        <div class="playlist-card-url">${esc(p.url)}</div>
+      </div>
+      <button class="playlist-del-btn" onclick="deleteCustomPlaylist(${i})" title="Delete">×</button>
+    </div>`
+  ).join('');
+}
+
+function addCustomPlaylist() {
+  const name = document.getElementById('newPlName').value.trim();
+  const url = document.getElementById('newPlUrl').value.trim();
+  if (!name || !url) { toast('⚠ Name and URL are required'); return; }
+  ST.customPlaylists.push({ name, url });
+  saveData();
+  document.getElementById('newPlName').value = '';
+  document.getElementById('newPlUrl').value = '';
+  renderCustomPlaylists();
+  renderSets();
+  toast('✓ Playlist added');
+}
+
+function deleteCustomPlaylist(idx) {
+  if (!confirm('Delete this playlist?')) return;
+  ST.customPlaylists.splice(idx, 1);
+  saveData();
+  renderCustomPlaylists();
+  renderSets();
+  toast('Playlist deleted');
+}
+
+function clearAllData() {
+  if (!confirm('Reset all ALive data? This cannot be undone.')) return;
+  localStorage.removeItem('alive_favorites');
+  localStorage.removeItem('alive_settings');
+  localStorage.removeItem('alive_customPlaylists');
+  localStorage.removeItem('alive_lastChannel');
+  location.reload();
+}
+
+/* ══════════════════════════════════════════
+   CHANNEL INFO SHEET
+══════════════════════════════════════════ */
+function openChInfo(idx) {
+  const ch = ST.channels[idx];
+  if (!ch) return;
+  const isFav = ST.favorites.has(ch.url);
+  const abbr = ch.name.replace(/[^A-Z0-9]/gi,'').slice(0,3).toUpperCase()||'?';
+  const body = document.getElementById('chInfoBody');
+  body.innerHTML = `
+    <div class="ch-info-header">
+      ${ST.settings.showLogos && ch.logo
+        ? `<img class="ch-info-logo" src="${esc(ch.logo)}" alt="" onerror="this.classList.add('hidden');this.nextElementSibling.style.display='flex'">`
+        : ''}
+      <div class="ch-info-logo-ph"${ST.settings.showLogos && ch.logo ? ' style="display:none"' : ''}>${abbr}</div>
+      <div class="ch-info-meta">
+        <div class="ch-info-name">${esc(ch.name)}</div>
+        <div class="ch-info-group">${esc(ch.group||'General')}${ch.number ? ' · Ch. ' + ch.number : ''}</div>
+      </div>
+    </div>
+    <div class="ch-info-actions">
+      <button class="ch-action-btn ch-action-play" onclick="playChannel(${idx});closeChInfo()">▶ Watch Now</button>
+      <button class="ch-action-btn ch-action-fav${isFav?' active':''}" id="chInfoFavBtn" onclick="toggleChInfoFav('${esc(ch.url)}',${idx})">${isFav ? '★ Saved' : '☆ Save'}</button>
+    </div>
+    <div style="padding:.5rem 1rem 1rem;font-size:.77rem;color:var(--text3);word-break:break-all;line-height:1.5">${esc(ch.url)}</div>
+  `;
+  document.getElementById('chInfoOverlay').classList.add('open');
+}
+
+function toggleChInfoFav(url, idx) {
+  const btn = document.getElementById('chInfoFavBtn');
+  if (ST.favorites.has(url)) {
+    ST.favorites.delete(url);
+    btn.classList.remove('active');
+    btn.textContent = '☆ Save';
+    toast('Removed from favorites');
+  } else {
+    ST.favorites.add(url);
+    btn.classList.add('active');
+    btn.textContent = '★ Saved';
+    toast('⭐ Added to favorites');
+  }
+  saveData();
+  renderFavList();
+  renderChannelList();
+}
+
+function closeChInfo(e) {
+  if (e && e.target !== document.getElementById('chInfoOverlay')) return;
+  document.getElementById('chInfoOverlay').classList.remove('open');
+}
+
+/* ══════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════ */
+let _toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ══════════════════════════════════════════
+   SKELETONS
+══════════════════════════════════════════ */
+function skeletons(n) {
+  return Array.from({length: n}, () =>
+    `<div class="ch-skeleton">
+      <div class="skel skel-logo"></div>
+      <div class="skel-info">
+        <div class="skel skel-line1"></div>
+        <div class="skel skel-line2"></div>
+      </div>
+    </div>`
+  ).join('');
+}
+
+/* ══════════════════════════════════════════
+   UTIL
+══════════════════════════════════════════ */
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ══════════════════════════════════════════
+   KEYBOARD SHORTCUTS
+══════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('chInfoOverlay').classList.remove('open');
+    if (ST.searchOpen) toggleSearch();
+  }
+  if (e.key === 'ArrowDown' && ST.activeIdx >= 0 && ST.activeIdx < ST.channels.length - 1) {
+    playChannel(ST.activeIdx + 1);
+  }
+  if (e.key === 'ArrowUp' && ST.activeIdx > 0) {
+    playChannel(ST.activeIdx - 1);
+  }
+});
+
+/* ══════════════════════════════════════════
+   ORIENTATION CHANGE HANDLER
+══════════════════════════════════════════ */
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    const video = document.getElementById('liveVideo');
+    if (video) video.style.height = '';
+  }, 200);
+});
+
+/* ══════════════════════════════════════════
+   LONG PRESS FOR CHANNEL INFO
+══════════════════════════════════════════ */
+let _lpTimer;
+document.getElementById('channelList').addEventListener('touchstart', e => {
+  const row = e.target.closest('.ch-row');
+  if (!row) return;
+  const onclick = row.getAttribute('onclick') || '';
+  const match = onclick.match(/playChannel\((\d+)\)/);
+  if (!match) return;
+  const idx = parseInt(match[1]);
+  _lpTimer = setTimeout(() => openChInfo(idx), 600);
+}, { passive: true });
+document.getElementById('channelList').addEventListener('touchend', () => clearTimeout(_lpTimer), { passive: true });
+document.getElementById('channelList').addEventListener('touchmove', () => clearTimeout(_lpTimer), { passive: true });
+
+/* ══════════════════════════════════════════
+   GUIDE BODY WRAP: landscape fix
+══════════════════════════════════════════ */
+function applyLayoutMode() {
+  const isLandscape = window.matchMedia('(orientation:landscape)').matches;
+  const layout = document.getElementById('guideLayout');
+  const bodyWrap = document.getElementById('guideBodyWrap');
+  if (isLandscape) {
+    layout.style.flexDirection = 'row';
+    bodyWrap.style.width = '260px';
+    bodyWrap.style.flexShrink = '0';
+    bodyWrap.style.borderLeft = '1px solid var(--b1)';
+    bodyWrap.style.flex = '';
+  } else {
+    layout.style.flexDirection = 'column';
+    bodyWrap.style.width = '';
+    bodyWrap.style.flexShrink = '';
+    bodyWrap.style.borderLeft = '';
+    bodyWrap.style.flex = '1';
+  }
+}
+applyLayoutMode();
+window.addEventListener('resize', applyLayoutMode);
+window.addEventListener('orientationchange', () => setTimeout(applyLayoutMode, 200));
+
+/* ══════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════ */
+init();
+</script>
+</body>
+</html>
